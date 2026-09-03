@@ -90,7 +90,7 @@ switch:
   - platform: gpio
     name: "Stepper Enable"
     pin:
-      number: GPIO23
+      number: GPIO25
       mode:
         output: true
   - platform: gpio

@@ -138,17 +138,40 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     on_press:
+      - logger.log: "limit hit time"
       - script.execute: power_off_timer
       - if:
           condition:
             lambda: 'return id(homing_active);'
           then:
             - logger.log: "🏠 HOME reached"
+            - globals.set:
+                id: move_direction
+                value: '0'
+            - stepper.set_target:
+                id: cl86y_motor
+                target: !lambda 'return id(cl86y_motor).current_position;'
+            - globals.set:
+                id: move_direction
+                value: '1'          # backing off is a positive/up move
+            - stepper.set_target:
+                id: cl86y_motor
+                target: 500
+            - stepper.report_position:
+                id: cl86y_motor
+                position: 0
+            # Zero the pulse-sensor position to match the stepper's zero
+            - lambda: |-
+                // Zero everything that tracks position immediately — don't wait on the save-on-stop interval
+                id(saved_step_position) = 0;
+                id(net_pulse_position) = 0;
+                id(last_pulse_total) = id(sensor_pulse_total).state;
+                id(net_screen_pulses).publish_state(0);
+            - globals.set:
+                id: homing_active
+                value: 'false'
           else:
             - logger.log: "⚠️ Limit switch hit unexpectedly — safety stop + resync"
-      # Stop movement immediately, no matter why we got here
-
-      
             - globals.set:
                 id: move_direction
                 value: '0'

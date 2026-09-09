@@ -79,6 +79,9 @@ globals:
 cover:
   - platform: template
     name: "Projector Screen"
+    has_position: true
+    lambda: |-
+      return id(screen_position_percent).state / 100.0f;
     open_action:  # Cancel any previous action need to takw into consideration
       - number.set:
           id: screen_target_position
@@ -311,6 +314,17 @@ sensor:
     accuracy_decimals: 1
     lambda: |-
       return id(cl86y_motor).current_position / $steps_per_unit;
+
+  - platform: template
+    name: "Screen Position Percent"
+    id: screen_position_percent
+    unit_of_measurement: "%"
+    state_class: "measurement"
+    update_interval: 500ms
+    accuracy_decimals: 0
+    lambda: |-
+      float percent = (id(cl86y_motor).current_position / $steps_per_unit) / 11.0 * 100.0;
+      return clamp(percent, 0.0f, 100.0f);
 
   - platform: pulse_counter
     id: raw_pulse_rate

@@ -116,11 +116,11 @@ switch:
         output: true
         pulldown: true
       inverted: true
-    on_turn_off:
-      then:
-        - stepper.set_target:
-                id: cl86y_motor
-                target: !lambda 'return id(cl86y_motor).current_position;'
+#    on_turn_off:
+#      then:
+#        - stepper.set_target:
+#                id: cl86y_motor
+#                target: !lambda 'return id(cl86y_motor).current_position;'
   - platform: gpio
     id: main_power_switch
     name: "Main Power"
@@ -132,11 +132,11 @@ switch:
     restore_mode: ALWAYS_OFF
     on_turn_on:
       - script.execute: power_off_timer   # start the idle clock as soon as power comes on
-    on_turn_off:
-      then:
-        - stepper.set_target:
-                id: cl86y_motor
-                target: !lambda 'return id(cl86y_motor).current_position;'
+#    on_turn_off:
+#      then:
+#        - stepper.set_target:
+#                id: cl86y_motor
+#                target: !lambda 'return id(cl86y_motor).current_position;'
         
 script:
   - id: power_off_timer
@@ -257,6 +257,9 @@ button:
       - globals.set:
           id: move_direction
           value: '-1'
+      - stepper.set_speed:
+          id: cl86y_motor
+          speed: 800 steps/s 
       - stepper.set_target:
           id: cl86y_motor
           target: -30000

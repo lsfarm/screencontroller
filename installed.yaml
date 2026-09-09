@@ -327,7 +327,7 @@ sensor:
     accuracy_decimals: 0
     lambda: |-
       float percent = (id(cl86y_motor).current_position / $steps_per_unit) / 11.0 * 100.0;
-      return clamp(percent, 0.0f, 100.0f);
+      return clamp(100.0f - percent, 0.0f, 100.0f);
 
   - platform: pulse_counter
     id: raw_pulse_rate

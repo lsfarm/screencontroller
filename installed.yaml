@@ -167,6 +167,9 @@ binary_sensor:
       number: GPIO12
       mode: INPUT_PULLUP
       inverted: true
+    filters:  
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - script.execute: power_off_timer
       - if:

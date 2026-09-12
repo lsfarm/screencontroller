@@ -47,7 +47,12 @@ captive_portal:
 
 substitutions:
   steps_per_unit: "23200.0"   # 20000 stepper steps = 1 HA "unit" — tweak this one value to change resolution
-    
+
+# ---------------- Auto Off Report to HA ----------------
+text_sensor:
+  - platform: template
+    name: "Auto Power Off"
+    id: auto_off  
 
 globals:
   - id: homing_active
@@ -85,15 +90,15 @@ cover:
     open_action:  # Cancel any previous action need to takw into consideration
       - number.set:
           id: screen_target_position
-          value: 1
+          value: 0
     close_action:
       - number.set:
           id: screen_target_position
-          value: 8
+          value: 11
     stop_action:
       - number.set:
           id: screen_target_position
-          value: 11
+          value: 8
 
 interval:
   - interval: 1s
@@ -116,11 +121,15 @@ switch:
         output: true
         pulldown: true
       inverted: true
-#    on_turn_off:
-#      then:
-#        - stepper.set_target:
-#                id: cl86y_motor
-#                target: !lambda 'return id(cl86y_motor).current_position;'
+
+    on_turn_on:
+      - script.execute: power_off_timer   # start the idle clock as soon as power comes on
+  
+    on_turn_off:
+      then:
+        - stepper.set_target:
+                id: cl86y_motor
+                target: !lambda 'return id(cl86y_motor).current_position;'
   - platform: gpio
     id: main_power_switch
     name: "Main Power"
@@ -132,19 +141,25 @@ switch:
     restore_mode: ALWAYS_OFF
     on_turn_on:
       - script.execute: power_off_timer   # start the idle clock as soon as power comes on
-#    on_turn_off:
-#      then:
-#        - stepper.set_target:
-#                id: cl86y_motor
-#                target: !lambda 'return id(cl86y_motor).current_position;'
+    on_turn_off:
+      then:
+        - stepper.set_target:
+                id: cl86y_motor
+                target: !lambda 'return id(cl86y_motor).current_position;'
         
 script:
   - id: power_off_timer
     mode: restart          # calling execute while it's already running just resets the delay
     then:
+      - text_sensor.template.publish:
+          id: auto_off
+          state: "Auto OFF in 10min"
       - delay: 10min
       - logger.log: "⏱️ 10 min idle — turning off Main Power"
       - switch.turn_off: main_power_switch
+      - text_sensor.template.publish:
+          id: auto_off
+          state: "Turned OFF"
       
 
     
@@ -192,9 +207,14 @@ binary_sensor:
             - stepper.set_target:
                 id: cl86y_motor
                 target: 500
+            - delay: 5s
             - stepper.report_position:
                 id: cl86y_motor
                 position: 0
+            - stepper.set_speed:
+                id: cl86y_motor
+                speed: 4000 steps/s 
+                
             # Zero the pulse-sensor position to match the stepper's zero
             - lambda: |-
                 // Zero everything that tracks position immediately — don't wait on the save-on-stop interval
@@ -215,34 +235,25 @@ binary_sensor:
                 value: 'false'
           else:
             - logger.log: "⚠️ Limit switch hit unexpectedly — safety stop + resync"
-      # Stop movement immediately, no matter why we got here
-
-      
+            - homeassistant.action:
+                action: notify.persistent_notification
+                data:
+                  message: "⚠️ Limit switch hit unexpectedly!"
+                  title: "Screen Controller Alert"
+            - homeassistant.service:
+                service: notify.mobile_app_brandons_iphone
+                data:
+                  title: "ESPHome Alert"
+                  message: "🧑‍💻➡️🤡 Projector Screen Has Hit Limit Unexpectedly!"
             - globals.set:
                 id: move_direction
                 value: '0'
             - stepper.set_target:
                 id: cl86y_motor
                 target: !lambda 'return id(cl86y_motor).current_position;'
-            - stepper.report_position:
-                id: cl86y_motor
-                position: 0
-            # Zero the pulse-sensor position to match the stepper's zero
-            - lambda: |-
-                // Zero everything that tracks position immediately — don't wait on the save-on-stop interval
-                id(saved_step_position) = 0;
-                id(net_pulse_position) = 0;
-                id(last_pulse_total) = id(sensor_pulse_total).state;
-                id(net_screen_pulses).publish_state(0);
-            - globals.set:
-                id: move_direction
-                value: '1'          # backing off is a positive/up move
-            - stepper.set_target:
-                id: cl86y_motor
-                target: 500
-            - globals.set:
-                id: homing_active
-                value: 'false'
+            
+            
+            
 
 # ---------------- HOME / STOP BUTTONS ----------------
 button:
@@ -326,8 +337,9 @@ sensor:
     update_interval: 500ms
     accuracy_decimals: 0
     lambda: |-
-      float percent = (id(cl86y_motor).current_position / $steps_per_unit) / 11.0 * 100.0;
+      float percent = (id(cl86y_motor).current_position / $steps_per_unit) / 11 * 100.0;
       return clamp(100.0f - percent, 0.0f, 100.0f);
+    # return clamp(percent, 0.0f, 100.0f);
 
   - platform: pulse_counter
     id: raw_pulse_rate
@@ -336,7 +348,7 @@ sensor:
       mode: INPUT_PULLUP
       inverted: true
     name: "Sensor Pulse Rate"
-    update_interval: 1s
+    update_interval: 50ms
     accuracy_decimals: 0
     unit_of_measurement: "pulses"
     internal: true             # set to false if you want the raw rate visible too
@@ -359,7 +371,6 @@ sensor:
     id: net_screen_pulses
     unit_of_measurement: "steps"
     accuracy_decimals: 0
-        
 
 
   

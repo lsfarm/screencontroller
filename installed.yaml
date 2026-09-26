@@ -226,14 +226,17 @@ binary_sensor:
                 
             - number.set: 
                 id: screen_target_position
-                value: 0
-                               
-
-                
+                value: 0                
             - globals.set:
                 id: homing_active
                 value: 'false'
           else:
+            - globals.set:
+                id: move_direction
+                value: '0'
+            - stepper.set_target:
+                id: cl86y_motor
+                target: !lambda 'return id(cl86y_motor).current_position;'
             - logger.log: "⚠️ Limit switch hit unexpectedly — safety stop + resync"
             - homeassistant.action:
                 action: notify.persistent_notification
@@ -245,15 +248,6 @@ binary_sensor:
                 data:
                   title: "ESPHome Alert"
                   message: "🧑‍💻➡️🤡 Projector Screen Has Hit Limit Unexpectedly!"
-            - globals.set:
-                id: move_direction
-                value: '0'
-            - stepper.set_target:
-                id: cl86y_motor
-                target: !lambda 'return id(cl86y_motor).current_position;'
-            
-            
-            
 
 # ---------------- HOME / STOP BUTTONS ----------------
 button:
@@ -371,6 +365,3 @@ sensor:
     id: net_screen_pulses
     unit_of_measurement: "steps"
     accuracy_decimals: 0
-
-
-  
